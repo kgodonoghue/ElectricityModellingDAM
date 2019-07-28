@@ -254,10 +254,10 @@ def createDF(user_name, passw, host_IP, database_name,dt):
     index_time = int(index_time)
     print(index_time)
     
-    for i in range(0,len(df_final)):
-        print(i)
-        df_final['time_stamp'].iloc[i]=pd.Timestamp(df_final['year'].iloc[i], df_final['month'].iloc[i], df_final['day'].iloc[i], df_final['hour'].iloc[i])
-    df_final['weekday'] = df_final['time_stamp'].dt.dayofweek 
+    df_final['weekday'] = pd.to_datetime(df_final['unix_date'],unit='s')
+    df_final['weekday']=df_final['weekday'].dt.dayofweek
+    
+    df_final=df_final.iloc[::sample_interval, :]
    
     df_final=df_final.iloc[1000:index_time]
     df_final=df_final.fillna(0) 
@@ -398,6 +398,7 @@ count=0
 clf=0
 interval_delay=1800
 no_epochs=70 
+sample_interval=1
 
 if __name__ == '__main__':
     cnx = mysql.connector.connect(user=user_name, password=passw,host=host_IP, database=database_name)
