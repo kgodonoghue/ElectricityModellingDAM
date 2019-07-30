@@ -366,18 +366,25 @@ recent_index=48
 if __name__ == '__main__':
     cnx = mysql.connector.connect(user=user_name, password=passw,host=host_IP, database=database_name)
     df_results = pd.read_sql('SELECT * FROM Forecast_DAM', cnx)
-    df_results['Delta']=abs(df_results['Model_DAM']-df_results['Actual_DAM'])
+    df_results=df_results.iloc[-100:]
+    df_smp = pd.read_sql('SELECT * FROM duos_tuos_semo_smp limit 100000,110000', cnx)
+    df_results = df_results.merge(df_smp,  how='inner', on=['unix_date'])
+    df_results['Delta']=abs(df_results['Model_DAM']-df_results['smp_d_minus_1'])
     results_array=[]
     for i in range(0,24):
         df_hour_delta=df_results[df_results['Hour']==i]
-        results_array.append([i,df_hour_delta['Delta'].mean()])
+        results_array.append([i,df_hour_delta['smp_d_minus_1'].mean(),df_hour_delta['Model_DAM'].mean(),df_hour_delta['Delta'].mean()])
+    hourly_info=pd.DataFrame(results_array)
+    hourly_info.to_csv('hourly_info.csv',index=False,header=True)
+    df_results=df_results[['unix_date','Date','Hour','Model_DAM','smp_d_minus_1','Delta','Actual_DAM_Old']]
+    df_results.to_csv('df_results.csv',index=False,header=True)
     results_array=np.array(results_array)
     fig, ax = plt.subplots(figsize=(20,15))
     ax.grid(linestyle='-', linewidth='0.5', color='grey')
     plt.xticks(rotation = 90)
     plt.rc('xtick', labelsize=20) 
     plt.rc('ytick', labelsize=20)
-    plt.plot(results_array[:,0],results_array[:,1],label='model prediction versus actual delta')
+    plt.plot(results_array[:,0],results_array[:,3],label='model prediction versus actual delta')
     plt.legend(loc='upper left', prop={'size': 20})    
     fig.suptitle('Average Delta at hourly time intervals', fontsize=25)
     plt.ylabel('Model Versus Actual Delta', fontsize=25)
@@ -390,5 +397,3 @@ if __name__ == '__main__':
     print(['mean',df_results_refine['Delta'].mean()])
     print(['median',df_results_refine['Delta'].median()])
     
-
- 
