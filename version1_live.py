@@ -253,17 +253,15 @@ def createDF(user_name, passw, host_IP, database_name,dt):
     index_time = df_final[df_final['unix_date']==dt].index.values.astype(int)
     index_time = int(index_time)
     print(index_time)
-    
-    df_final['weekday'] = pd.to_datetime(df_final['unix_date'],unit='s')
-    df_final['weekday']=df_final['weekday'].dt.dayofweek
-    
-    df_final=df_final.iloc[::sample_interval, :]
-   
     df_final=df_final.iloc[1000:index_time]
+    
     df_final=df_final.fillna(0) 
     df_final.to_csv('final_file.csv',index=False,header=True)
     df_final = pd.read_csv('final_file.csv')
     
+    df_final['weekday'] = pd.to_datetime(df_final['unix_date'],unit='s')
+    df_final['weekday']=df_final['weekday'].dt.dayofweek 
+   
     
     labels_forecast=['hour_interval', 'WindForecastEirgrid','hour','weekday']
     labels_historical_short=['smp_d_minus_1','TSODemandForecast','TSORenewableForecast','INSTRUCTION_CODE']
@@ -340,7 +338,7 @@ def create_model_output(model_type,input_values_combined, output_values_range,co
             xtest=xtest_3D
             ytrain=ytrain_3D
             ytest=ytest_3D            
-            if (count==0) or (count==1):
+            if (count==0) or (count>0):
                 clf = Sequential() 
                 clf.add(LSTM(200, input_shape=(xtrain.shape[1], xtrain.shape[2])))
                 clf.add(Dense(1))
@@ -381,7 +379,7 @@ database_name = 'smartpow_world'
 corr_limit=0   
 forward_look_short=48
 forward_look_long=96
-test_window=1  
+test_window=54  
 index_start_input_long=1000
 index_start_output=index_start_input_long+forward_look_long 
 index_start_input_short=index_start_input_long+forward_look_short 
@@ -396,18 +394,19 @@ final_performance=[]
 lstm_history=96
 count=0
 clf=0
-interval_delay=1800
-no_epochs=70 
-sample_interval=1
+interval_delay=0
+no_epochs=50
+number_days=1
+time_interval_test=86400
 
 if __name__ == '__main__':
-    cnx = mysql.connector.connect(user=user_name, password=passw,host=host_IP, database=database_name)
-    df_forecast = pd.read_sql('SELECT * FROM Forecast_DAM', cnx)
-    dt=df_forecast['unix_date'].iloc[len(df_forecast)]
-    print(dt)
-    dt=dt+1800
-    for i in range(0,10000,1):
+    
+    import time
+    dt = datetime.datetime(2019, 7, 31 , 23 , 00 ) 
+    dt=time.mktime(dt.timetuple())
+    for i in range(0,number_days,1):
         for model_type in model_list:
+            # create the input and output variables for modelling
             start_time = time.time()
             [all_labels,df_final,labels_forecast,labels_historical_short,labels_historical_long]=createDF(user_name, passw, host_IP, database_name,dt)
             [input_values_combined, output_values_range]=create_final_input_output(df_final,model_type)
@@ -432,27 +431,13 @@ if __name__ == '__main__':
             df_output['Actual_DAM']=df_final['smp_d_minus_1'].iloc[len(df_final)-test_window:]
             df_output['Actual_DAM_Refresh']=ytest_descaled[:,0]
             df_output.to_csv('df_output.csv',index=False,header=True)
-            df_output =df_output.drop(df_output.index[0:-1])
-            df_output.to_csv('df_output_one.csv',index=False,header=True)
-       
+
             if count==0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
-                df_output.to_sql(name='Forecast_DAM_Dev', con=engine, if_exists = 'append', index=False)
+                df_output.to_sql(name='Forecast_DAM', con=engine, if_exists = 'append', index=False)
             if count>0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
-                df_output.to_sql(name='Forecast_DAM_Dev', con=engine, if_exists = 'append', index=False)
-           
+                df_output.to_sql(name='Forecast_DAM', con=engine, if_exists = 'append', index=False)
+         
             count=count+1
-            dt=dt+1800
-            
-            if count==47:
-                count=0
-                        
-            for j in range(0,10000000):
-                time.sleep(5)
-                stop_time = time.time()
-                print(stop_time-start_time)
-                if stop_time-start_time>interval_delay:
-                    break
-   
- 
+            dt=dt+time_interval_test 
