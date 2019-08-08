@@ -253,18 +253,23 @@ def createDF(user_name, passw, host_IP, database_name,dt):
     index_time = df_final[df_final['unix_date']==dt].index.values.astype(int)
     index_time = int(index_time)
     print(index_time)
-    df_final=df_final.iloc[1000:index_time]
-    
-    df_final=df_final.fillna(0) 
-    df_final.to_csv('final_file.csv',index=False,header=True)
-    df_final = pd.read_csv('final_file.csv')
     
     df_final['weekday'] = pd.to_datetime(df_final['unix_date'],unit='s')
     df_final['weekday']=df_final['weekday'].dt.dayofweek
     
-    #df_final=df_final.iloc[::sample_interval, :]
+    df_final['Bank Holiday']=df_final['dates_x'].isin([1012019,170319,18032019,22042019,6052019,3062019,5082019,28102019,25122019,26122019])
+    df_final['Bank Holiday']=df_final['Bank Holiday'].astype(int)
+ 
+   
+    df_final=df_final.iloc[::sample_interval, :]
+   
+    df_final=df_final.iloc[1000:index_time]
+    df_final=df_final.fillna(0) 
+    df_final.to_csv('final_file.csv',index=False,header=True)
+    df_final = pd.read_csv('final_file.csv')
+   
     
-    labels_forecast=['hour_interval', 'WindForecastEirgrid','hour','weekday']
+    labels_forecast=['hour_interval', 'WindForecastEirgrid','hour','weekday','Bank Holiday']
     labels_historical_short=['smp_d_minus_1','TSODemandForecast','TSORenewableForecast','INSTRUCTION_CODE']
     labels_historical_long=['sum_power','pressure_value','temperature_value','sum_power','smp_d_plus_4','smp_d_minus_1','FUEL_GAS','FUEL_OTHER_FOSSIL', 
                             'co2','FUEL_COAL','hour','MIX_COAL', 'TotalPN', 'DemandActualEirgrid', 'WindActual', 
@@ -388,28 +393,30 @@ range_size=5
 range_alpha=5
 start_smp_database=24000
 stop_smp_database=40000
-window_smp_database=9000
+window_smp_database=15000
 model_list=['regression'] 
-model_list=['RF']
+model_list=['lstm_3D']
+#model_list=['RF']
 final_performance=[]
 lstm_history=96
 count=0
 clf=0
 interval_delay=0
-no_epochs=1 
+no_epochs=50
+number_days=10
+time_interval_test=86400
 sample_interval=1
 
 if __name__ == '__main__':
     
     import time
-    dt = datetime.datetime(2019, 6, 1 , 1 , 00 ) 
+    dt = datetime.datetime(2019, 7, 30 , 20 , 00 ) 
     dt=time.mktime(dt.timetuple())
-    for i in range(0,30,1):
+    for i in range(0,number_days,1):
         for model_type in model_list:
             # create the input and output variables for modelling
             start_time = time.time()
             [all_labels,df_final,labels_forecast,labels_historical_short,labels_historical_long]=createDF(user_name, passw, host_IP, database_name,dt)
-            # df_final=df_final.iloc[::2, :]
             [input_values_combined, output_values_range]=create_final_input_output(df_final,model_type)
             [pred_train,pred_test,ytrain,ytest,clf]=create_model_output(model_type,input_values_combined, output_values_range,count,clf,no_epochs)        
             data = pd.DataFrame()
@@ -432,20 +439,15 @@ if __name__ == '__main__':
             df_output['Actual_DAM']=df_final['smp_d_minus_1'].iloc[len(df_final)-test_window:]
             df_output['Actual_DAM_Refresh']=ytest_descaled[:,0]
             df_output.to_csv('df_output.csv',index=False,header=True)
-            #df_output =df_output.drop(df_output.index[0:-1])
-            #df_output.to_csv('df_output_one.csv',index=False,header=True)
+
             if count==0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
-                df_output.to_sql(name='Forecast_DAM_Dev', con=engine, if_exists = 'replace', index=False)
+                df_output.to_sql(name='Forecast_DAM_Dev', con=engine, if_exists = 'append ', index=False)
             if count>0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
                 df_output.to_sql(name='Forecast_DAM_Dev', con=engine, if_exists = 'append', index=False)
          
             count=count+1
-            dt=dt+86400
-            
-
-       
-            
+            dt=dt+time_interval_test
    
  
