@@ -1,3 +1,10 @@
+#experiments
+# RF day fill
+# LSTM day fill
+# RF interval fill - one model
+# RF interval fill - train each sample
+# LSTM train each sample
+
 import pymysql
 pymysql.install_as_MySQLdb()
 import mysql.connector
@@ -270,7 +277,7 @@ def createDF(user_name, passw, host_IP, database_name,dt):
    
     
     labels_forecast=['hour_interval', 'WindForecastEirgrid','hour','weekday','Bank Holiday']
-    labels_historical_short=['smp_d_minus_1','TSODemandForecast','TSORenewableForecast','INSTRUCTION_CODE']
+    labels_historical_short=['smp_d_minus_1','TSODemandForecast','TSORenewableForecast']
     labels_historical_long=['sum_power','pressure_value','temperature_value','sum_power','smp_d_plus_4','smp_d_minus_1','FUEL_GAS','FUEL_OTHER_FOSSIL', 
                             'co2','FUEL_COAL','hour','MIX_COAL', 'TotalPN', 'DemandActualEirgrid', 'WindActual', 
                             'FUEL_RENEW','GBP', 'TSODemandForecast','TSORenewableForecast','INSTRUCTION_CODE','gas']
@@ -300,7 +307,7 @@ def create_model_output(model_type,input_values_combined, output_values_range,co
             ytest=ytest[lstm_history:]
         elif model_type=='RF':
             [xtrain,xtest,ytrain,ytest]=splitPreProcess(input_values_combined,output_values_range,test_window,lstm_history)
-            if (count==0):
+            if (count>-1):
                 clf = RandomForestRegressor(max_depth=10, random_state=0,n_estimators=50)
                 clf.fit(xtrain, ytrain)
                 print(clf.feature_importances_)
@@ -409,8 +416,8 @@ lstm_history=96
 count=0
 clf=0
 interval_delay=0
-no_epochs=50
-number_intervals=430
+no_epochs=30
+number_intervals=26
 time_interval_test=1800
 sample_interval=1
 wait_delay=0
@@ -418,7 +425,7 @@ wait_delay=0
 if __name__ == '__main__':
     
     import time
-    dt = datetime.datetime(2019, 7, 29 , 20 , 00 ) 
+    dt = datetime.datetime(2019, 8, 11 , 20 , 00 ) 
     dt=time.mktime(dt.timetuple())
     for i in range(0,number_intervals,1):
         for model_type in model_list:
@@ -448,9 +455,9 @@ if __name__ == '__main__':
             df_output['Actual_DAM_Refresh']=ytest_descaled[:,0]
             df_output.to_csv('df_output.csv',index=False,header=True)
 
-            if count==0:
+            if count==0: 
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
-                df_output.to_sql(name='Forecast_DAM_Dev', con=engine, if_exists = 'append', index=False)
+                df_output.to_sql(name='Forecast_DAM_Dev', con=engine, if_exists = 'replace', index=False)
             if count>0:
                 engine = create_engine('mysql+mysqldb://fergus:Uniwhite_8080@185.176.0.173:3306/smartpow_world', echo = False)
                 df_output.to_sql(name='Forecast_DAM_Dev', con=engine, if_exists = 'append', index=False)
@@ -463,6 +470,6 @@ if __name__ == '__main__':
                 stop_time = time.time()
                 print(stop_time-start_time)
                 if stop_time-start_time>wait_delay:
-                    break  
+                    break   
    
  
